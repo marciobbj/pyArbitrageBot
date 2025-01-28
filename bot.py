@@ -8,9 +8,10 @@ from pathlib import Path
 from web3 import Web3
 import pandas as pd
 
+
 # Configuration Manager
 class Config:
-    def __init__(self, config_file='config.ini'):
+    def __init__(self, config_file='./config.ini'):
         self.config = configparser.ConfigParser()
         if not Path(config_file).exists():
             self._create_default_config()
@@ -79,8 +80,8 @@ class Config:
 
 class ContractScanner:
     def __init__(self, config):
-        self.config = config
-        self.w3 = Web3(Web3.HTTPProvider(config.get('API', 'INFURA_URL')))
+        self.config = config.config
+        self.w3 = Web3(Web3.HTTPProvider(self.config.get('API', 'INFURA_URL')))
         self.goplus_url = "https://api.gopluslabs.io/api/v1/token_security/"
 
     def is_contract_safe(self, token_address):
@@ -235,7 +236,7 @@ class DataFetcher:
         self.session = requests.Session()
         self.headers = {
             'Accepts': 'application/json',
-            'X-CMC_PRO_API_KEY': config.api_key
+            'X-CMC_PRO_API_KEY': self.config.api_key
         }
         self.db = db
         self.scanner = scanner
@@ -347,7 +348,7 @@ class CryptoArbitrageTracker:
         self.fetcher = DataFetcher(self.config, self.db, self.scanner, self.analyzer)
         self.arbitrage_analyzer = ArbitrageAnalyzer(self.config)
         self.settings = self.config.get_settings()
-        self.notifier = TelegramNotifier(self.config)
+        # self.notifier = TelegramNotifier(self.config)
 
     def run(self):
         try:
@@ -375,24 +376,25 @@ class CryptoArbitrageTracker:
                 pair['price'],
                 pair['volume']
             )
-        # Modified _check_arbitrage_opportunities method
-        def _check_arbitrage_opportunities(self):
-            filters = self.config.get_filters()
-            for crypto_id in self.settings['crypto_ids']:
-                prices = self.db.get_filtered_prices(crypto_id, filters['min_volume'])
-                opportunities = self.arbitrage_analyzer.detect_arbitrage_opportunities(prices)
-                if opportunities:
-                    for opp in opportunities:
-                        message = (
-                            f"🚨 <b>Arbitrage Opportunity</b> 🚨\n"
-                            f"Coin ID: {crypto_id}\n"
-                            f"Buy: {opp['min_exchange']} @ ${opp['min_price']}\n"
-                            f"Sell: {opp['max_exchange']} @ ${opp['max_price']}\n"
-                            f"Spread: {opp['spread']}%\n"
-                            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                        )
-                        logging.info(message)
-                        self.notifier.send_message(message)  # Send Telegram notification
+
+    def _check_arbitrage_opportunities(self):
+        filters = self.config.get_filters()
+        for crypto_id in self.settings['crypto_ids']:
+            prices = self.db.get_filtered_prices(crypto_id, filters['min_volume'])
+            opportunities = self.arbitrage_analyzer.detect_arbitrage_opportunities(prices)
+            if opportunities:
+                for opp in opportunities:
+                    message = (
+                        f"🚨 <b>Arbitrage Opportunity</b> 🚨\n"
+                        f"Coin ID: {crypto_id}\n"
+                        f"Buy: {opp['min_exchange']} @ ${opp['min_price']}\n"
+                        f"Sell: {opp['max_exchange']} @ ${opp['max_price']}\n"
+                        f"Spread: {opp['spread']}%\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                    logging.info(message)
+                    # self.notifier.send_message(message)  # Send Telegram notification
+
 class TelegramNotifier:
     def __init__(self, config):
         self.bot_token = config.get('TELEGRAM', 'BOT_TOKEN')
@@ -423,5 +425,7 @@ if __name__ == "__main__":
     while True:
         valid_tokens = fetcher.fetch_and_validate_tokens()
         logging.info(f"Found {len(valid_tokens)} safe tokens")
-        # Process valid tokens for arbitrage...
-        time.sleep(int(config.get('SETTINGS', 'SCAN_INTERVAL')))
+        # Procss valid tokens for arbitrage...
+        t = int(config.get('SETTINGS', 'SCAN_INTERVAL'))
+        logging.info(f"Next iteration in {t} seconds")
+        time.sleep(t)
