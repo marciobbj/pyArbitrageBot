@@ -102,7 +102,7 @@ class ContractScanner:
             result = data['result'][token_address.lower()]
             return self._parse_security_data(result)
         except Exception as e:
-            logging.error(f"Security API error: {str(e)}")
+            logging.exception(f"Security API error: {str(e)}")
             return False
 
     def _parse_security_data(self, security_data):
@@ -152,7 +152,7 @@ class SupplyAnalyzer:
             )
 
         except Exception as e:
-            logging.error(f"Supply analysis failed: {str(e)}")
+            logging.exception(f"Supply analysis failed: {str(e)}")
             return False
 
 
@@ -235,7 +235,7 @@ class DataFetcher:
         self.config = config
         self.session = requests.Session()
         self.headers = {
-            'Accepts': 'application/json',
+            'Accept': '*/*',
             'X-CMC_PRO_API_KEY': self.config.api_key
         }
         self.db = db
@@ -245,7 +245,7 @@ class DataFetcher:
 
     def fetch_market_pairs(self, crypto_id):
         try:
-            params = {'id': crypto_id, 'limit': 200}
+            params = {'id': crypto_id, 'limit': 200, 'sort_dir': 'desc', 'start': 1}
             response = self.session.get(
                 self.config.config['API']['API_URL'],
                 headers=self.headers,
@@ -254,7 +254,7 @@ class DataFetcher:
             response.raise_for_status()
             return self._filter_market_data(response.json())
         except Exception as e:
-            logging.error(f"API Error: {str(e)}")
+            logging.exception(f"API Error: {str(e)}")
             return None
 
     def _filter_market_data(self, data):
@@ -281,7 +281,7 @@ class DataFetcher:
             'convert': 'USD'
         }
         headers = {
-            'X-CMC_PRO_API_KEY': self.config.get('API', 'CMC_KEY')
+            'X-CMC_PRO_API_KEY': self.config.get('API', 'API_KEY')
         }
         try:
             response = requests.get(
@@ -296,7 +296,7 @@ class DataFetcher:
                     valid_tokens.append(token)
             return valid_tokens
         except Exception as e:
-            logging.error(f"CMC fetch error: {str(e)}")
+            logging.exception(f"CMC fetch error: {str(e)}")
             return []
 
     def _validate_token(self, token):
@@ -412,13 +412,13 @@ class TelegramNotifier:
             response = requests.post(url, data=payload)
             response.raise_for_status()
         except Exception as e:
-            logging.error(f"Telegram send failed: {str(e)}")
+            logging.exception(f"Telegram send failed: {str(e)}")
 
 if __name__ == "__main__":
     tracker = CryptoArbitrageTracker()
     tracker.run()
     config = Config()
-    db = DatabaseManager(config.get('DATABASE', 'NAME'))
+    db = DatabaseManager(config.config.get('DATABASE', 'NAME'))
     scanner = ContractScanner(config)
     analyzer = SupplyAnalyzer(config)
     fetcher = DataFetcher(config, db, scanner, analyzer)
